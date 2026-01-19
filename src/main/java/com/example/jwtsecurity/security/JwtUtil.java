@@ -4,15 +4,15 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
+import javax.crypto.SecretKey;
 import java.util.*;
 
 @Component
 public class JwtUtil
 {
-    private static final String SECRET_KEY =
-            "hserkvkhskjmasjdbadsecretkeystronegstkeyauthentication123";
-    private static final long EXPIRATION_TIME = 60 * 60 * 1000; // 1hr
+    private final SecretKey key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+
+    private static final long EXPIRATION = 1000 * 60 * 60; // 1hr
 
 
     //Generate Token
@@ -20,12 +20,33 @@ public class JwtUtil
     {
         return Jwts.builder()
                 .setSubject(username)
-                .claim("role","ROLE_" + role)
+                .claim("role", role)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
-                .signWith(Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8)),
-                        SignatureAlgorithm.HS256)
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
+                        .signWith(key)
                 .compact();
+    }
+
+    //Extract Username
+    public String extractUsername(String token)
+    {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+    }
+
+    //Extract Role
+    public String extractRole(String token)
+    {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("role", String.class);
     }
 
     //Validate Token
@@ -33,38 +54,13 @@ public class JwtUtil
     {
         try
         {
-            Jwts.parserBuilder()
-                    .setSigningKey(SECRET_KEY.getBytes(StandardCharsets.UTF_8))
+            Jwts.parserBuilder().setSigningKey(key)
                     .build()
                     .parseClaimsJws(token);
             return true;
-        }catch(ExpiredJwtException e)
-        {
-            System.out.println("Token Expired");
-        }catch(JwtException e)
-        {
-            System.out.println("Invalid Token");
+        }catch(Exception e) {
+            return false;
         }
-        return false;
     }
 
-    //Extract Username
-    public String extractUsername(String token)
-    {
-        return extractClaims(token).getSubject();
-    }
-    //Extract Roles
-    public String extractRole(String token)
-    {
-        return extractClaims(token).get("role",String.class);
-    }
-
-    private Claims extractClaims(String token)
-    {
-        return Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY.getBytes(StandardCharsets.UTF_8))
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-    }
 }
